@@ -232,6 +232,42 @@ def render_html(rep: dict) -> str:
                    f"<th>互动</th><th>出现时间</th></tr>{signal_rows}</table>"
                    if signal_rows else "<div class='tl-meta'>暂无前沿信号</div>")
 
+    # ---- 七、采集缺口与自我进化 ----
+    evo = rep.get("evolution") or {}
+    type_label = {"no_event": "无事件", "thin_event": "覆盖薄",
+                  "stale_event": "事件陈旧", "tutorial": "常青教程"}
+    type_color = {"no_event": "#dc2626", "thin_event": "#d97706",
+                  "stale_event": "#6b7280", "tutorial": "#2563eb"}
+    if evo.get("top_gaps"):
+        gap_rows = "".join(
+            f"<tr><td><b>{esc(g['topic'])}</b></td>"
+            f"<td><span class='badge' style='color:{type_color.get(g['gap_type'], '#666')}'>"
+            f"{type_label.get(g['gap_type'], g['gap_type'])}</span></td>"
+            f"<td>{g['blogger_count']} 人</td><td>{g['post_count']}</td>"
+            f"<td style='white-space:normal'>{esc(g['reason'][:80])}</td>"
+            f"<td style='white-space:normal'>{esc(' / '.join(g.get('samples') or [])[:70])}</td></tr>"
+            for g in evo["top_gaps"])
+        gap_table = (f"<table><tr><th>话题</th><th>缺口类型</th><th>涉及博主</th>"
+                     f"<th>帖数</th><th>判定依据</th><th>样本内容</th></tr>{gap_rows}</table>")
+    else:
+        gap_table = "<div class='tl-meta'>本轮未检测到采集缺口。</div>"
+    evo_notes = []
+    if evo.get("resolved"):
+        evo_notes.append(f"<div class='match'>✅ <b>本轮闭环解决</b>：{esc(', '.join(evo['resolved']))}"
+                         f"（新采集已覆盖这些话题）</div>")
+    if evo.get("learned"):
+        evo_notes.append(f"<div class='match'>📚 <b>词典新学实体词</b>："
+                         f"{esc(', '.join(x['canonical'] for x in evo['learned']))}"
+                         f"（下轮采集的热榜/RSS 条目将自动打上这些话题标签）</div>")
+    if evo.get("stale"):
+        evo_notes.append(f"<div class='match'>⏹ <b>停止追补</b>：{esc(', '.join(evo['stale']))}"
+                         f"（连续多轮未采到覆盖，判定教程类常青内容或源不覆盖）</div>")
+    evo_html = (f"<div class='panel'><h2>七、采集缺口与自我进化</h2>{gap_table}"
+                f"{''.join(evo_notes)}"
+                f"<div class='foot'>博主视频是热点舆情的「下游信号」：多位博主都在讲某话题、"
+                f"而舆情基线无对应事件时，判定为采集缺口（不是博主独苗）。系统自动把话题加入"
+                f"采集关键词，下一轮生效，并持续闭环验证。</div></div>")
+
     profile_rows = "".join(
         f"<tr><td>{esc(pr['blogger'])}</td><td>{esc(pr['platform'])}</td><td>{esc(pr['style'])}</td>"
         f"<td>{pr['avg_score'] or '-'}</td><td>{pr['counts'].get('踩中热点', 0)}</td>"
@@ -302,12 +338,13 @@ th{{background:#fafbfe;color:#5b6577;font-size:12px}}
 <div class="foot">仅统计命中舆情事件的内容（≥2 个事件）；「提前布局」=内容发布早于舆情首发时间。</div></div>
 <div class="panel"><h2>六、前沿信号（论文 / 开源动态）</h2>{signal_html}
 <div class="foot">来自 arXiv / HF Daily Papers / GitHub Trending 的超前信号：当下讨论量尚低，常是下一波热点源头，适合提前卡位；不计入追热/滞后判据。</div></div>
+{evo_html}
 <div class="foot">数据来源：POV 舆情验证系统 · 标注「示例数据」的博主内容为演示用途，非真实发布内容；验证逻辑与结论为真实计算。</div>
 </div></body></html>"""
 
 
-def save_report(verified: list, baseline: dict, cfg: dict) -> dict:
-    rep = build_report(verified, baseline, cfg)
+def save_report(verified: list, baseline: dict, cfg: dict, evo: dict | None = None) -> dict:
+    rep = build_report(verified, baseline, cfg, evo)
     ts = storage.now_stamp()
     md_path = storage.REPORTS / f"pov-report-{ts}.md"
     with open(md_path, "w", encoding="utf-8") as f:

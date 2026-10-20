@@ -15,7 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from core import storage, baseline as bl, blogger_monitor as bm, verify as vf, report as rp, scheduler  # noqa: E402
+from core import storage, baseline as bl, blogger_monitor as bm, verify as vf, report as rp, scheduler, evolution  # noqa: E402
 
 
 def cmd_collect(cfg):

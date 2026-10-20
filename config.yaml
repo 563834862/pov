@@ -125,6 +125,14 @@ schedule:
   run_on_start: true          # 看板/调度启动后先立即跑一轮
   start_delay_seconds: 30     # 启动延迟（避开开机网络未就绪、看板先起来）
 
+# 自我进化：博主内容反推采集缺口 → 自动补词 → 闭环验证（详见 core/evolution.py）
+evolution:
+  enabled: true
+  min_bloggers: 2          # 判定采集缺口的最少博主数（同话题）
+  thin_event_max_count: 2  # 事件报道条数 ≤ 此值视为覆盖薄
+  stale_rounds: 3          # 连续多少轮未覆盖 → 判定 stale 停止追补
+  max_active_keywords: 12  # 并发生效的进化关键词上限（防采集请求膨胀）
+
 web:
   host: 127.0.0.1
   # 8765 已被本机其他服务（uvicorn）占用，故 POV 默认改用 8766；

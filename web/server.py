@@ -15,7 +15,7 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 
-from core import storage, scheduler
+from core import storage, scheduler, evolution
 from core.baseline import build_baseline
 from core.blogger_monitor import check_bloggers
 from core.timeline import blogger_response_speed
@@ -81,6 +81,8 @@ def build_state(cfg) -> dict:
                       "enabled": (cfg.get("schedule") or {}).get("enabled", True),
                       "collect_interval_hours": (cfg.get("schedule") or {}).get("collect_interval_hours", 6),
                       "verify_interval_hours": (cfg.get("schedule") or {}).get("verify_interval_hours", 2)},
+        "evolution": evolution.dashboard_state(),
+        "last_evolution": state.get("last_evolution") or {},
         "last_collect_at": state.get("last_collect_at"),
         "last_verify_at": state.get("last_verify_at"),
     }

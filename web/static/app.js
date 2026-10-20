@@ -4,11 +4,13 @@
 
   var VERDICT_CLASS = {
     "踩中热点": "v-green", "追热偏早": "v-amber", "追热偏晚": "v-amber",
-    "选题滞后": "v-red", "独苗选题": "v-blue", "数据不足": "v-gray"
+    "选题滞后": "v-red", "独苗选题": "v-blue", "数据不足": "v-gray",
+    "领域外内容": "v-gray"
   };
   var BADGE_CLASS = {
     "踩中热点": "vb-green", "追热偏早": "vb-amber", "追热偏晚": "vb-amber",
-    "选题滞后": "vb-red", "独苗选题": "vb-blue", "数据不足": "vb-gray"
+    "选题滞后": "vb-red", "独苗选题": "vb-blue", "数据不足": "vb-gray",
+    "领域外内容": "vb-gray"
   };
   var PHASE_CLASS = {
     "发酵期": "ph-ferment", "活跃期": "ph-active", "苗头期": "ph-sprout",
@@ -44,15 +46,17 @@
   function renderKpis(state) {
     var b = state.baseline || {};
     var posts = state.posts || [];
-    var riding = 0, judged = 0;
+    var riding = 0, judged = 0, off = 0;
     posts.forEach(function (p) {
       var v = (p.verification || {}).verdict;
+      if (v === "领域外内容") { off++; return; }
       if (v && v !== "数据不足") {
         judged++;
         if (v === "踩中热点" || v === "追热稳健" || v === "追热偏早" || v === "追热偏晚") riding++;
       }
     });
     var rate = judged ? Math.round(riding / judged * 100) : null;
+    var gapCount = ((state.last_evolution || {}).top_gaps || []).length;
     var kpis = [
       { label: "舆情健康分", value: b.health_score == null ? "-" : b.health_score,
         sub: b.ok ? "基线已就绪" : "未采集", color: b.health_score >= 80 ? "var(--green)" : (b.health_score >= 60 ? "var(--amber)" : "var(--red)") },
@@ -60,7 +64,8 @@
       { label: "监控博主", value: (state.system.bloggers || []).length, sub: (state.system.bloggers || []).slice(0, 2).join(" / ") },
       { label: "已验证内容", value: posts.length, sub: "含示例演示数据" },
       { label: "追热命中率", value: rate == null ? "-" : rate + "<small>%</small>",
-        sub: riding + "/" + judged + " 条命中当前热点" }
+        sub: riding + "/" + judged + " 条命中当前热点" },
+      { label: "🧬 采集缺口", value: gapCount, sub: off + " 条领域外已剔除", color: gapCount ? "var(--red)" : "var(--green)" }
     ];
     $("kpis").innerHTML = kpis.map(function (k) {
       return '<div class="kpi"><div class="label">' + k.label + '</div>' +
@@ -317,6 +322,42 @@
       fmtTime(baseline.collected_at) + "</div>";
   }
 
+  function renderEvolution(evo, last) {
+    var el = $("evolutionStatus");
+    if (!evo) { el.innerHTML = ""; return; }
+    var rows = [];
+    var gaps = (last && last.top_gaps) || [];
+    var typeLabel = {no_event: "无事件", thin_event: "覆盖薄", stale_event: "事件陈旧", tutorial: "常青教程"};
+    if (gaps.length) {
+      rows.push('<div class="src-row"><span>本轮检测缺口</span><span class="st-bad">' +
+        gaps.length + " 个</span></div>");
+      gaps.forEach(function (g) {
+        rows.push('<div class="src-row" style="font-size:12px"><span>🧬 ' + esc(g.topic) +
+          '（' + g.blogger_count + ' 位博主）</span><span>' +
+          esc(typeLabel[g.gap_type] || g.gap_type) + "</span></div>");
+      });
+    } else {
+      rows.push('<div class="src-row"><span>本轮检测缺口</span><span class="st-ok">0 个</span></div>');
+    }
+    var act = (evo.active_keywords || []).length;
+    rows.push('<div class="src-row"><span>进化关键词（采集中）</span><span>' +
+      (act ? esc((evo.active_keywords || []).slice(0, 6).join("、")) + (act > 6 ? " 等" + act : "") : "无") +
+      "</span></div>");
+    if ((evo.resolved || []).length) {
+      rows.push('<div class="src-row"><span>已闭环解决</span><span class="st-ok">' +
+        esc(evo.resolved.slice(0, 6).join("、")) + "</span></div>");
+    }
+    if ((evo.stale || []).length) {
+      rows.push('<div class="src-row"><span>停止追补（教程/源不覆盖）</span><span>' +
+        esc(evo.stale.slice(0, 6).join("、")) + "</span></div>");
+    }
+    if ((evo.dynamic_lexicon || {}) && Object.keys(evo.dynamic_lexicon).length) {
+      rows.push('<div class="src-row"><span>词典新学词</span><span>' +
+        esc(Object.keys(evo.dynamic_lexicon).slice(0, 8).join("、")) + "</span></div>");
+    }
+    el.innerHTML = rows.join("");
+  }
+
   function renderScheduler(sc) {
     var el = $("schedulerStatus");
     if (!sc) { el.innerHTML = ""; return; }
@@ -387,6 +428,7 @@
     renderHotTopics(state.hot_topics || []);
     renderSources(state.baseline || {});
     renderScheduler(state.scheduler);
+    renderEvolution(state.evolution, state.last_evolution);
     renderProfiles(state.profiles || []);
     renderSpeed(state.speed || []);
     var job = state.job || {};
