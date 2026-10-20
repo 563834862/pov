@@ -1,0 +1,132 @@
+# 舆情验证系统（POV - Public Opinion Verification）配置
+# 核心流程：采集领域舆情基线 → 监控博主新内容 → 选题与舆情比对 → 输出验证结论
+
+system:
+  name: 舆情验证系统
+  version: 0.5.0
+
+# 舆情基线关键词（博主所在领域，决定抓什么热点作比对）
+# 范围 = AI 全领域 + 科技前沿热点（马斯克/特斯拉等用户关注面）
+keywords:
+  - AI工具
+  - AIGC
+  - AI视频生成
+  - AI短剧
+  - AI变现
+  - AI创业
+  - 大模型
+  - 智能体
+  - AI行业动态
+  - 科技热点
+
+baseline:
+  range: 7d            # 舆情时间窗：24h / 7d / 30d
+  top_n: 10            # 热点榜每榜条数
+  # 采集源按《舆情与AI新闻采集来源总清单》分层登记（详见 core/source_registry.py）
+  # 原则：官方 API > 原生 RSS > RSSHub > 爬虫；已关停源禁止登记（配置校验会告警）
+  sources:
+    # ---- 政策层（清单第一、二、三章；长周期热点）----
+    - gov_policy       # 中国政府网 · 国务院政策文件库（无官方 API，容错解析）
+    - federal_register # 美联邦公报 · 官方 API 免费无 key（规则/行政令/关税）
+    - gdelt            # GDELT DOC 2.0 · 全球事件库 15 分钟更新，自带 tone 情绪分
+    # ---- AI 一手信源（清单第四章；技术突破先于新闻稿，信噪比高地）----
+    - arxiv            # arXiv 官方 API（cs.AI/CL/LG/CV/MA，限 1 请求/3 秒）
+    - hf_papers        # HuggingFace 每日精选论文（含 upvotes/githubStars）
+    - github_trending  # GitHub 趋势项目（Trending 页解析，Search API 兜底）
+    # ---- 媒体 / 社区（清单第五章；原生 RSS 覆盖最全）----
+    - qbitai           # 量子位（中文原生 RSS）
+    - infoq            # InfoQ 中文（原生 RSS）
+    - venturebeat_ai   # VentureBeat AI 专栏 RSS
+    - techcrunch_ai    # TechCrunch AI 频道 RSS
+    - theverge_ai      # The Verge AI 频道 RSS
+    - arstechnica      # Ars Technica RSS
+    - mittr            # MIT Technology Review RSS
+    - openai_news      # OpenAI 官方新闻 RSS（剔除客户案例稿）
+    - hackernews       # HackerNews 首页（Algolia API 直连）
+    - producthunt      # ProductHunt 每日新品（Atom feed 直连）
+    # ---- 国内舆情 / 热度榜（清单第七章；情绪与热度）----
+    - search_engine    # 搜索引擎结果（由 Agent 喂入 data/inputs/ 或手工放入）
+    - kr36             # 36氪搜索页
+    - baidu_news       # 百度新闻
+    - toutiao          # 今日头条搜索
+    - bilibili_rank    # B站全站热榜（按标题过滤 AI 相关）
+    - weibo_hot        # 微博热搜榜（★ 免费热度榜，需 Referer）
+    - baidu_hot        # 百度热搜榜（★ 免费热度榜）
+    - toutiao_hot      # 头条热榜（★ 免费热度榜，含 HotValue）
+    # ---- 桥接喂入（被墙 / 强风控平台）----
+    - x_search         # X 平台（域名被墙，由 Agent WebSearch 喂入 data/inputs/oversea-x-*.json）
+    - youtube_search   # YouTube 平台（域名被墙，由 Agent WebSearch 喂入 data/inputs/oversea-yt-*.json）
+
+# 各源的附加参数（留空则用模块内置默认值）
+sources_extra:
+  # arXiv：仅用于本地相关性过滤（关键词检索会触发 arXiv 限流），取 AI 分类最新提交
+  arxiv_queries: ["AI video generation", "AI agent", "open weights model"]
+  # 美联邦公报检索词
+  fedreg_terms: ["artificial intelligence", "machine learning", "semiconductor"]
+  # 中国政府网政策文件库检索词（按公文标题检索，需用公文口径的词）
+  gov_terms: ["人工智能", "大模型", "生成式人工智能"]
+  # GDELT 检索式
+  gdelt_query: '("artificial intelligence" OR "generative AI" OR "AI model")'
+  github_token: ""     # 可选：填 GitHub PAT 提高 Search API 额度
+
+# 监控博主清单（真实关注列表，mode=douyin_bridge 经浏览器桥接复用 Chrome 登录态采集）
+bloggers:
+  - {name: 英雄哪里出来, url: "https://www.douyin.com/user/MS4wLjABAAAA8035N_Be0iOxBvGr0vQZD2g3p5zAarwWET3wLOJkTBc", mode: douyin_bridge}
+  - {name: 第四种黑猩猩, url: "https://www.douyin.com/user/MS4wLjABAAAAZwr8jX4xwZqPkdc-cJ2MVWvwh3d_rHxluq1ArMrcsBjZ32WONVrcLkvpNN7-Od99", mode: douyin_bridge}
+  - {name: 一鸣财经, url: "https://www.douyin.com/user/MS4wLjABAAAA_0YhWOn5ljVopcARIKtajFplrPi2_nHiChaJDJzLOXA", mode: douyin_bridge}
+  - {name: 斜杠青年小冯, url: "https://www.douyin.com/user/MS4wLjABAAAAK6kupLerq1IiMgLZD_z8lCZywpq3RhUZgruMpDR-LQplMRJY5h9YuNR9BYckqe9Z", mode: douyin_bridge}
+  - {name: 朋克周, url: "https://www.douyin.com/user/MS4wLjABAAAAqW8dJX9-mXgmeucLFQW9iPwKz8LHOXBnLzscBfG-YBGLIv_lWbdPa3PUfvl9-6Q5", mode: douyin_bridge}
+  - {name: 二次螈Ai工具箱, url: "https://www.douyin.com/user/MS4wLjABAAAAzNFg4BNYvP0utmSzBgTd7rI03lFyiAXIW6gPV3FE4xk", mode: douyin_bridge}
+  - {name: dontbesilent聊赚钱, url: "https://www.douyin.com/user/MS4wLjABAAAA6S1IqPN_vfnt9xpQEer4lip2Z787TlIG9N9fsOrAQvA", mode: douyin_bridge}
+  - {name: 小郑还挺忙, url: "https://www.douyin.com/user/MS4wLjABAAAAlmQDgHf0NlbsjrfWENm8LyrIikxSRRq7mzlzQSIStQJkV7Ju52B6A55zw5TUDU5d", mode: douyin_bridge}
+  - {name: 秋芝2046, url: "https://www.douyin.com/user/MS4wLjABAAAAwbbVuf1W2DdgRe0xCa0oxg1ZIHbzuiTzyjq3NcOVgBuu6qIidYlMYqbL3ZFY2swu", mode: douyin_bridge}
+  - {name: 程序员三千, url: "https://www.douyin.com/user/MS4wLjABAAAAX3NNh1vNefo9PD0gEjkEx86Ar0On3a9TsgLSsZSxorA", mode: douyin_bridge}
+  - {name: 哈佛老徐抓AI趋势, url: "https://www.douyin.com/user/MS4wLjABAAAAEMfJKktSQaUca9ThGGFBxiQaXF3WgkswT3j-bIjaoupi3NTK6g8nKaaKCELdx5yA", mode: douyin_bridge}
+  - {name: 技术爬爬虾, url: "https://www.douyin.com/user/MS4wLjABAAAAFSp1EdCLJkoMieKaEVgSj2uoZpVw9ZDyymICRsuR3SQ", mode: douyin_bridge}
+  - {name: 阿硕讲ai, url: "https://www.douyin.com/user/MS4wLjABAAAAgX1oCinqiAdiU_oNSGkUEvoa26aSQ0qdVUQz67v_-QvHWwQTi-5nuidT4bIUQHO2", mode: douyin_bridge}
+  - {name: 飞天闪客, url: "https://www.douyin.com/user/MS4wLjABAAAAnVCQPCy6KOdAxfj6LJj4DDFyknf74LQQUMVjYA8PLL-jPrgQpcgSScTEo2s3nS1V", mode: douyin_bridge}
+  - {name: 凯哥AI工具箱, url: "https://www.douyin.com/user/MS4wLjABAAAAvSGR2tuK9FSATTTHWt0JiPS4fxVbINt4lrbTUvEyFAFxqmObq0g3Ja1zdIIrK3RK", mode: douyin_bridge}
+  - {name: 托尼三三, url: "https://www.douyin.com/user/MS4wLjABAAAADuHnQfBr2PvwTRSbqYZ2M0kSBjJJcIbx0a6N2r8XW7A", mode: douyin_bridge}
+  - {name: 黄益贺, url: "https://www.douyin.com/user/MS4wLjABAAAA0hrPqt3M7MUOZ9eo55AdMwLA81kkobjkG7lExwmze8aW9n5563rMZQ4DAfMREcvE", mode: douyin_bridge}
+  - {name: 认知便利店M, url: "https://www.douyin.com/user/MS4wLjABAAAAunHYdY4NGYEF7jlLFsLD6oVYYHb2WswuCJHFI8YaNOE", mode: douyin_bridge}
+  - {name: 产品老曾职场进阶, url: "https://www.douyin.com/user/MS4wLjABAAAA7YPC9dXg8FUn8pQyjPmNOQ5FQ8bzW0Zx4TRDLOEexISBMINkAAfLTsnTDp9l3oQb", mode: douyin_bridge}
+  - {name: 逐帧拉片专注AI视频, url: "https://www.douyin.com/user/MS4wLjABAAAANRgVR5-F9crpwtGbsOsTUFFW_w9Al_l20hnCExMOsbMn_NW7Wej8JPCVkDwJPjyS", mode: douyin_bridge}
+  - {name: 尘风AI华小二团队, url: "https://www.douyin.com/user/MS4wLjABAAAAGIVKp_NxAdeVXZjXxnsyDf5a-RHIGATn0eGCm7otYGqLVYaFFgAFE_VwOJfkMNag", mode: douyin_bridge}
+  - {name: Bob同学, url: "https://www.douyin.com/user/MS4wLjABAAAAcDjz7QQqVdHuVVS6u6VUd2X6LrzCv-PvxF2ruApz3F4", mode: douyin_bridge}
+  - {name: 直男财经, url: "https://www.douyin.com/user/MS4wLjABAAAADUObyc_aoKXnXnV01JEcZMdvU0_ZFvFnVQAU-weztOgHubCQont1aDrDASxWu8B6", mode: douyin_bridge}
+
+# 验证引擎权重（满分 100）
+verify:
+  weights:
+    heat: 45      # 热度契合：报道覆盖广度 + 互动量归一
+    timing: 25    # 时效契合：事件传播阶段（发酵期最佳）
+    volume: 10    # 声量参照：博主互动量 vs 事件均量
+    diff: 20      # 差异化：热点饱和度（过饱和扣分，独苗给中等分）
+
+# 重复舆情判重（采集即去重：完全重复不入库，来源并入保留条目的 sources）
+dedup:
+  enabled: true
+  similarity: 0.30       # IDF 余弦阈值，≥ 此值且时间接近 → 判为同一件事
+  time_window_hours: 72  # 判定同一件事允许的最大发布间隔
+  min_shared_terms: 4    # 兜底：共享显著性实体词最少数（门槛高于 similarity）
+  near_dup_merge: false  # true=同源报道直接合并为一条；false=保留为同一事件的多条报道
+
+# 英文标题翻译（海外源→中文；凭证从 ~/.workbuddy/models.json 的 StepFun 条目读取）
+translate:
+  enabled: true
+  batch_size: 10
+  timeout: 45
+
+# 自动调度（看板内嵌线程 / pov.py schedule / Windows 计划任务共用；文件锁防重入）
+schedule:
+  enabled: true               # false = 全手动（点看板按钮或跑 CLI）
+  collect_interval_hours: 6   # 舆情基线采集周期（26 源全量，约 1-2 分钟）
+  verify_interval_hours: 2    # 博主验证周期（每次采集后 1 分钟自动触发一次验证）
+  run_on_start: true          # 看板/调度启动后先立即跑一轮
+  start_delay_seconds: 30     # 启动延迟（避开开机网络未就绪、看板先起来）
+
+web:
+  host: 127.0.0.1
+  # 8765 已被本机其他服务（uvicorn）占用，故 POV 默认改用 8766；
+  # 如需临时换端口：python pov.py serve --port=8899
+  port: 8766

@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# 运行时数据（采集原始数据、基线、报告、状态文件）
+data/
+
+# 运行日志
+logs/
+
+# 浏览器桥接缓存
+.playwright-mcp/
+
+# 系统文件
+Thumbs.db
+desktop.ini
+.DS_Store

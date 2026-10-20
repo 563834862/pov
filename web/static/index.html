@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>舆情验证系统 · POV</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%A1%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">📡</span>
+    <span class="name">舆情验证系统</span>
+    <span class="ver" id="sysVer">POV</span>
+  </div>
+  <div class="kw-chips" id="kwChips"></div>
+  <div class="actions">
+    <button class="btn primary" id="btnCollect">① 采集舆情基线</button>
+    <button class="btn" id="btnVerify">② 运行博主验证</button>
+    <span class="job" id="jobStatus"></span>
+    <span class="clock" id="clock"></span>
+  </div>
+</header>
+
+<section class="kpis" id="kpis"></section>
+
+<section class="panel" id="eventLibPanel">
+  <div class="panel-head">
+    <h2>📰 舆情事件库</h2>
+    <span class="hint">按日期查询 · 分页浏览 · 点击事件查看跟进博主与作品链接</span>
+  </div>
+  <div class="ev-filter">
+    <label>从 <input type="date" id="evStart"></label>
+    <label>到 <input type="date" id="evEnd"></label>
+    <input type="search" id="evQ" placeholder="标题/话题关键词">
+    <select id="evSize">
+      <option value="10">10 条/页</option>
+      <option value="20" selected>20 条/页</option>
+      <option value="50">50 条/页</option>
+    </select>
+    <button class="btn primary" id="evSearch">查询</button>
+    <span class="ev-quick">
+      <a href="javascript:void(0)" data-days="0">今天</a>
+      <a href="javascript:void(0)" data-days="7">近7天</a>
+      <a href="javascript:void(0)" data-days="30">近30天</a>
+      <a href="javascript:void(0)" data-days="all">全部</a>
+    </span>
+  </div>
+  <div id="eventList" class="ev-list"></div>
+  <div class="ev-pager">
+    <button class="btn" id="evPrev">‹ 上一页</button>
+    <span id="evPageInfo"></span>
+    <button class="btn" id="evNext">下一页 ›</button>
+  </div>
+  <div id="eventDetail" class="ev-detail hidden"></div>
+</section>
+
+<section class="panel" id="hotTopicPanel">
+  <div class="panel-head">
+    <h2>🔥 你的关注圈在热议（近30天）</h2>
+    <span class="hint">已监控博主的选题面 · 与右侧「舆情关注点」互为镜像，同频=踩稳，单边=缺口或差异机会</span>
+  </div>
+  <div id="hotTopicList" class="focus-list"></div>
+</section>
+
+<main class="grid">
+  <section class="panel">
+    <div class="panel-head">
+      <h2>博主动态 · 选题验证</h2>
+      <span class="hint">博主发内容 → 与最新舆情基线比对 → 选题判定</span>
+    </div>
+    <div id="postList" class="post-list"></div>
+  </section>
+
+  <aside class="panel side">
+    <div class="panel-head"><h2>当前舆情关注点</h2><span class="hint">选题参考</span></div>
+    <div id="focusList" class="focus-list"></div>
+    <div class="panel-head"><h2>前沿信号</h2><span class="hint">论文 / 开源</span></div>
+    <div id="signalList" class="focus-list"></div>
+    <div class="panel-head"><h2>自动调度</h2><span class="hint">周期自动采集 / 验证</span></div>
+    <div id="schedulerStatus" class="source-status"></div>
+    <div class="panel-head"><h2>采集源状态</h2></div>
+    <div id="sourceStatus" class="source-status"></div>
+  </aside>
+</main>
+
+<section class="panel">
+  <div class="panel-head"><h2>博主选题风格画像</h2><span class="hint">基于历史验证结论聚合</span></div>
+  <div class="table-wrap">
+    <table id="profileTable">
+      <thead>
+        <tr><th>博主</th><th>平台</th><th>风格</th><th>平均分</th><th>🟢 踩中</th><th>🟡 稳健</th><th>🟡 偏早/晚</th><th>🔴 滞后</th><th>🔵 独苗</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-head"><h2>⚡ 博主追热响应速度榜</h2><span class="hint">命中 ≥2 个舆情事件，按平均滞后升序</span></div>
+  <div class="table-wrap">
+    <table id="speedTable">
+      <thead>
+        <tr><th>博主</th><th>命中事件</th><th>平均滞后</th><th>最快跟进</th><th>提前布局</th><th>24h 内跟进</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<footer class="foot">
+  <span>数据来源：POV 舆情验证系统 · 舆情基线采集自主流公开平台（详见采集源状态）</span>
+  <span>带「示例」标记的博主内容为演示数据，非真实发布内容；验证逻辑与结论为真实计算。</span>
+</footer>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
