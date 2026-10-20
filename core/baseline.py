@@ -27,6 +27,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from . import storage
+from . import evolution
 from .events import build_news_events
 from .feedkit import UA, _is_ai_related, _is_promo, _mk_item
 from .lexicon import extract_topics
@@ -235,7 +236,9 @@ def collect_all(cfg: dict) -> tuple:
     """
     bcfg = cfg.get("baseline", {})
     extra = cfg.get("sources_extra", {})
-    keywords = cfg.get("keywords") or ["AI工具", "AIGC"]
+    # 采集关键词 = 配置关键词 + 进化关键词（博主反推出的采集缺口，见 core/evolution）
+    keywords = list(dict.fromkeys(
+        (cfg.get("keywords") or ["AI工具", "AIGC"]) + evolution.active_keywords()))
     top_n = int(bcfg.get("top_n", 10))
     sources = list(bcfg.get("sources") or []) + list(extra.get("enabled") or [])
     if not sources:
@@ -294,7 +297,9 @@ def run_analyze(pom_json: Path, outdir: Path, store: Path) -> Path:
 
 def build_baseline(cfg: dict) -> dict:
     """完整基线流程：采集 -> 统一JSON -> analyze.py -> 新闻事件聚类 -> 快照。"""
-    keywords = cfg.get("keywords") or ["AI工具", "AIGC"]
+    # 采集关键词 = 配置关键词 + 进化关键词（博主反推出的采集缺口，见 core/evolution）
+    keywords = list(dict.fromkeys(
+        (cfg.get("keywords") or ["AI工具", "AIGC"]) + evolution.active_keywords()))
     kw_str = ",".join(keywords)
     items, status = collect_all(cfg)
 

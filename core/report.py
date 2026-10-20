@@ -21,7 +21,7 @@ def _fmt_time(iso: str) -> str:
         return str(iso)[:16]
 
 
-def build_report(verified: list, baseline: dict, cfg: dict) -> dict:
+def build_report(verified: list, baseline: dict, cfg: dict, evo: dict | None = None) -> dict:
     """汇总报告数据（供 Markdown/HTML/GUI 共用）。"""
     focus = opinion_focus(baseline, top_n=10)
     signals = opinion_signals(baseline, top_n=12)
@@ -30,10 +30,12 @@ def build_report(verified: list, baseline: dict, cfg: dict) -> dict:
     pov_events = baseline.get("pov_events") or []
     speed = blogger_response_speed(verified, pov_events)
     verdict_order = {"踩中热点": 0, "追热稳健": 1, "追热偏早": 2, "追热偏晚": 3,
-                     "选题滞后": 4, "独苗选题": 5, "数据不足": 6}
+                     "选题滞后": 4, "独苗选题": 5, "领域外内容": 7, "数据不足": 6}
     posts = sorted(verified, key=lambda p: (verdict_order.get((p.get("verification") or {}).get("verdict"), 9),
                                             -((p.get("verification") or {}).get("total") or 0)))
     sim_count = sum(1 for p in verified if p.get("simulated"))
+    off_count = sum(1 for p in verified
+                    if (p.get("verification") or {}).get("verdict") == "领域外内容")
     return {
         "generated_at": storage.now_iso(),
         "keywords": baseline.get("keywords") or "",
@@ -46,7 +48,9 @@ def build_report(verified: list, baseline: dict, cfg: dict) -> dict:
         "speed": speed,
         "posts": posts,
         "simulated_count": sim_count,
+        "off_domain_count": off_count,
         "total_count": len(verified),
+        "evolution": evo or {},
     }
 
 
@@ -127,12 +131,39 @@ def render_markdown(rep: dict) -> str:
     if not rep["signals"]:
         L.append("| - | - | - | - | - | - |")
 
+    # ---- 七、采集缺口与自我进化 ----
+    evo = rep.get("evolution") or {}
+    L += ["", "## 七、采集缺口与自我进化", "",
+          "博主视频是热点舆情的「下游信号」：多位博主近期都在讲某话题、而舆情基线",
+          "却没有对应事件时，判定为**采集缺口**（不是博主独苗）——系统自动把该话题",
+          "加入采集关键词，下一轮采集生效，并在后续轮次闭环验证是否被覆盖。", ""]
+    if evo.get("top_gaps"):
+        L += ["| 话题 | 缺口类型 | 涉及博主 | 帖数 | 判定依据 |",
+              "|------|----------|----------|------|----------|"]
+        type_label = {"no_event": "无事件", "thin_event": "覆盖薄",
+                      "stale_event": "事件陈旧", "tutorial": "常青教程"}
+        for g in evo["top_gaps"]:
+            L.append(f"| {g['topic']} | {type_label.get(g['gap_type'], g['gap_type'])} | "
+                     f"{g['blogger_count']} 人 | {g['post_count']} | {g['reason'][:52]} |")
+    else:
+        L.append("本轮未检测到采集缺口。")
+    resolved = evo.get("resolved") or []
+    learned = evo.get("learned") or []
+    stale = evo.get("stale") or []
+    if resolved:
+        L += ["", f"**本轮闭环解决**：{', '.join(resolved)}（新采集已覆盖这些话题）"]
+    if learned:
+        L += ["", f"**词典新学实体词**：{', '.join(x['canonical'] for x in learned)}"
+                   "（下轮采集的热榜/RSS 条目将自动打上这些话题标签）"]
+    if stale:
+        L += ["", f"**停止追补**：{', '.join(stale)}（连续多轮未采到覆盖，"
+                   "判定为教程类常青内容或源不覆盖）"]
+
     L += ["", "---",
           f"数据来源：POV 舆情验证系统 · 舆情基线来自「{rep['keywords']}」相关公开信息",
           "标注「示例数据」的博主内容为演示用途，非真实发布内容；验证逻辑与结论为真实计算。",
           ""]
     return "\n".join(L)
-
 
 def render_html(rep: dict) -> str:
     """单文件 HTML 报告（无外部依赖，可直接分享）。"""
@@ -255,6 +286,8 @@ th{{background:#fafbfe;color:#5b6577;font-size:12px}}
   <div class="kpi"><div class="l">🟢 踩中热点</div><div class="v" style="color:#16a34a">{counts.get('踩中热点', 0)}</div></div>
   <div class="kpi"><div class="l">🟡 追热（稳健/偏早/晚）</div><div class="v" style="color:#d97706">{counts.get('追热稳健', 0) + counts.get('追热偏早', 0) + counts.get('追热偏晚', 0)}</div></div>
   <div class="kpi"><div class="l">🔴 滞后 / 🔵 独苗</div><div class="v">{counts.get('选题滞后', 0)} / {counts.get('独苗选题', 0)}</div></div>
+  <div class="kpi"><div class="l">⚪ 领域外内容</div><div class="v" style="color:#6b7280">{counts.get('领域外内容', 0)}</div></div>
+  <div class="kpi"><div class="l">🧬 采集缺口（进化中）</div><div class="v" style="color:#7c3aed">{(rep.get('evolution') or {}).get('gap_count', 0)}</div></div>
 </div>
 <div class="panel"><h2>一、当前舆情关注点（选题参考）</h2>
 <table><tr><th>#</th><th>话题</th><th>代表事件</th><th>阶段</th><th>报道数</th><th>均互动</th></tr>{focus_rows}</table>
